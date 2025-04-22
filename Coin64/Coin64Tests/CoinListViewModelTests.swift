@@ -66,4 +66,18 @@ class CoinListViewModelTests: XCTestCase {
         }
         waitForExpectations(timeout: 1)
     }
+
+    func testShowDetail_DetailViewModelCreation() {
+        let mockRepository = MockRepository()
+        let viewModel = CoinListViewModel(coinRepository: mockRepository)
+        let expectation = self.expectation(description: "History and Latest loaded")
+        viewModel.sortedCoinDataResponse = [
+            CoinInfoResponse(timestamp: 1744256801, type: "", market: "", instrument: "", open: 0, high: 0, low: 0, close: 0)
+        ]
+        viewModel.showDetail(index: 0) { detailViewModel in
+            XCTAssertEqual(detailViewModel.formattedCurrentDate(), "10. Apr 2025 at 05:46")
+            expectation.fulfill()
+        }
+        waitForExpectations(timeout: 1)
+    }
 }
