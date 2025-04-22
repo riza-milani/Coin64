@@ -8,7 +8,7 @@
 import UIKit
 
 class CoinListViewCell: UITableViewCell {
-    private let label = UILabel()
+    private let dateLabel = UILabel()
     let nameLabel = UILabel()
     let valueLabel = UILabel()
     var coinInfoResponse: CoinInfoResponse? {
@@ -28,11 +28,11 @@ class CoinListViewCell: UITableViewCell {
     }
 
     private func setupLabel() {
-        label.translatesAutoresizingMaskIntoConstraints = false
-        label.font = UIFont.systemFont(ofSize: Constants.Layout.padding)
-        label.textColor = .black
-        label.font = UIFont.systemFont(ofSize: Constants.FontSize.primary)
-        contentView.addSubview(label)
+        dateLabel.translatesAutoresizingMaskIntoConstraints = false
+        dateLabel.font = UIFont.systemFont(ofSize: Constants.Layout.padding)
+        dateLabel.textColor = .black
+        dateLabel.font = UIFont.systemFont(ofSize: Constants.FontSize.secondary)
+        contentView.addSubview(dateLabel)
 
         nameLabel.translatesAutoresizingMaskIntoConstraints = false
         nameLabel.font = UIFont.systemFont(ofSize: Constants.FontSize.primary)
@@ -46,10 +46,10 @@ class CoinListViewCell: UITableViewCell {
         contentView.addSubview(valueLabel)
 
         NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Constants.Layout.padding),
-            label.topAnchor.constraint(equalTo: contentView.topAnchor, constant: Constants.Layout.paddingSmall),
+            dateLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Constants.Layout.padding),
+            dateLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: Constants.Layout.paddingSmall),
 
-            nameLabel.topAnchor.constraint(equalTo: label.bottomAnchor, constant: Constants.Layout.padding),
+            nameLabel.topAnchor.constraint(equalTo: dateLabel.bottomAnchor, constant: Constants.Layout.padding),
             nameLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: Constants.Layout.padding),
 
             valueLabel.topAnchor.constraint(equalTo: nameLabel.topAnchor),
@@ -63,7 +63,7 @@ class CoinListViewCell: UITableViewCell {
     }
 
     func configure(with info: CoinInfoResponse?) {
-        label.text = "\(String(coinInfoResponse?.timestamp ?? 0).formattedDate)"
+        dateLabel.text = "\(String(coinInfoResponse?.timestamp ?? 0).formattedDate)"
         nameLabel.text = "Last Price:"
         valueLabel.text = String(format: "%.2f EUR", coinInfoResponse?.close ?? 0)
     }
@@ -79,6 +79,7 @@ extension CoinListViewCell {
 
         struct FontSize {
             static let primary: CGFloat = 18
+            static let secondary: CGFloat = 14
         }
     }
 }

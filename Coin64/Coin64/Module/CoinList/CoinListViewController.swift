@@ -11,33 +11,27 @@ class CoinListViewController: UIViewController {
 
     private let tableView = UITableView()
     private let activityIndicator = UIActivityIndicatorView(style: .large)
-    private var errorLabel: UILabel?
     var coinViewModel: CoinListViewModel?
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "BTC History"
+        title = Constants.viewControllerTitle
         view.backgroundColor = .systemBackground
         setupTableView()
-        showLoading()
+        
         coinViewModel?.getBTCHistory { [weak self] result in
             DispatchQueue.main.async { [weak self] in
-                self?.hideLoading()
                 self?.tableView.reloadData()
             }
         }
     }
 
     override func viewWillAppear(_ animated: Bool) {
-        coinViewModel?.setRefreshLastPrice(isEnable: true) {
-            DispatchQueue.main.async { [weak self] in
-                self?.tableView.reloadRows(at: [IndexPath(row: 0, section: 0)], with: .fade)
-            }
-        }
+        refreshTableView(isEnabled: true)
     }
 
     override func viewWillDisappear(_ animated: Bool) {
-        coinViewModel?.setRefreshLastPrice(isEnable: false) { }
+        refreshTableView(isEnabled: false)
     }
 
     private func setupTableView() {
@@ -56,48 +50,45 @@ class CoinListViewController: UIViewController {
             tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
     }
+
+    private func refreshTableView(isEnabled: Bool) {
+        if isEnabled {
+            coinViewModel?.setRefreshLastPrice(isEnable: true) {
+                DispatchQueue.main.async { [weak self] in
+                    self?.tableView.reloadRows(at: [IndexPath(row: 0, section: 0)], with: .fade)
+                }
+            }
+        }
+        else {
+            coinViewModel?.setRefreshLastPrice(isEnable: false) { }
+        }
+    }
 }
 
-
-// - MARK: Loading Indicator
-
-extension CoinListViewController {
-    func showLoading() {
-        activityIndicator.startAnimating()
-        tableView.backgroundView = activityIndicator
-    }
-    func hideLoading() {
-        activityIndicator.stopAnimating()
-        tableView.backgroundView = nil
-    }
-}
-
-// - MARK: Error Handling
+// - MARK: Error Handling and Loading Indicator
 
 extension CoinListViewController: CoinListViewDelegate {
-    func showError(message: String) {
-        let label = UILabel()
-        label.text = message
-        label.textAlignment = .center
-        label.textColor = .systemRed
-        label.numberOfLines = 0
-        label.font = .systemFont(ofSize: 16, weight: .medium)
-        label.translatesAutoresizingMaskIntoConstraints = false
-
-        view.addSubview(label)
-        NSLayoutConstraint.activate([
-            label.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            label.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            label.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 20),
-            label.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -20)
-        ])
-        errorLabel = label
+    func showError(message: String, retryAction: @escaping () -> Void) {
+        tableView.isHidden = true
+        refreshTableView(isEnabled: false)
+        createErrorView(message: message, retryAction: retryAction)
         hideLoading()
     }
 
     func hideError() {
-        errorLabel?.removeFromSuperview()
-        errorLabel = nil
+        tableView.isHidden = false
+        refreshTableView(isEnabled: true)
+        removeErrorView()
+    }
+
+    func showLoading() {
+        activityIndicator.startAnimating()
+        tableView.backgroundView = activityIndicator
+    }
+
+    func hideLoading() {
+        activityIndicator.stopAnimating()
+        tableView.backgroundView = nil
     }
 }
 
@@ -107,6 +98,7 @@ extension CoinListViewController: UITableViewDelegate {
         coinViewModel?.showDetail(index: indexPath.row) { coinDetailViewModel in
             let coinDetailViewController = CoinDetailViewController()
             coinDetailViewController.coinDetailViewModel = coinDetailViewModel
+            coinDetailViewModel.viewDeleagte = coinDetailViewController
             navigationController?.pushViewController(
                 coinDetailViewController,
                 animated: true
@@ -124,5 +116,12 @@ extension CoinListViewController: UITableViewDataSource {
         guard let cell = tableView.dequeueReusableCell(withIdentifier: String(describing: CoinListViewCell.self), for: indexPath) as? CoinListViewCell else { return UITableViewCell() }
         cell.coinInfoResponse = coinViewModel?.sortedCoinDataResponse[indexPath.row]
         return cell
+    }
+}
+
+// -MARK: Constants
+extension CoinListViewController {
+    enum Constants {
+        static let viewControllerTitle: String = "Coin History"
     }
 }

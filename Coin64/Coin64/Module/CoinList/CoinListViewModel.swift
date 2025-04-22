@@ -8,7 +8,9 @@
 import Foundation
 
 protocol CoinListViewDelegate {
-    func showError(message: String)
+    func showLoading()
+    func hideLoading()
+    func showError(message: String, retryAction: @escaping () -> Void)
     func hideError()
 }
 
@@ -23,7 +25,7 @@ protocol CoinListViewModelProtocol {
 
 class CoinListViewModel: CoinListViewModelProtocol {
     private let coinRepository: CoinRepositoryProtocol
-    let refreshRateInSeconds: TimeInterval = 60
+    let refreshRateInSeconds: TimeInterval = 10
 
     private var timer: Timer?
     var viewDeleagte: CoinListViewDelegate?
@@ -34,6 +36,7 @@ class CoinListViewModel: CoinListViewModelProtocol {
     }
 
     func getBTCHistory(completion: @escaping ([CoinInfoResponse]) -> Void) {
+        viewDeleagte?.showLoading()
         coinRepository
             .fetchHistory(
                 instrumentType: .btc,
@@ -42,10 +45,16 @@ class CoinListViewModel: CoinListViewModelProtocol {
                 dateTimeStamp: nil
             ) { [weak self] result in
                 guard let self = self else { return }
+                DispatchQueue.main.async { [weak self] in
+                    self?.viewDeleagte?.hideLoading()
+                }
                 switch result {
-                case .failure(_):
+                case .failure(let error):
                     DispatchQueue.main.async { [weak self] in
-                        self?.viewDeleagte?.showError(message: "There was an error fetching data from the server.")
+                        self?.viewDeleagte?.showError(message: "Unable to fetch the list of prices.\n\(error.localizedDescription)") {
+                            self?.viewDeleagte?.hideError()
+                            self?.getBTCHistory(completion:completion)
+                        }
                     }
                     completion([])
                 case .success(let coinDataResponse):
@@ -62,7 +71,12 @@ class CoinListViewModel: CoinListViewModelProtocol {
             // Update with latest price and date
             switch result {
             case .failure(let error):
-                //Note: This can be managed like getBTCHistory, but for keep it small I skip it. (please check CoinDetailViewModel.swift comment)
+                DispatchQueue.main.async { [weak self] in
+                    self?.viewDeleagte?.showError(message: "Unable to fetch the latest price.\n\(error.localizedDescription)") {
+                        self?.viewDeleagte?.hideError()
+                        self?.getLatestBTC(completion:completion)
+                    }
+                }
                 completion()
             case .success(let coinDataResponse):
                 if !sortedCoinDataResponse.isEmpty {

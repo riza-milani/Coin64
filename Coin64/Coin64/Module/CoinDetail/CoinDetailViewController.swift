@@ -16,14 +16,15 @@ class CoinDetailViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .white
-        title = "BTC Detail"
+        title = Constants.viewControllerTitle
 
         setupDateLabel()
-        showLoadingIndicator()
+        
         coinDetailViewModel?.getBTCCurrencies { [weak self] result in
             DispatchQueue.main.async {
-                self?.hideLoadingIndicator()
-                self?.setupCurrencyRows(coinInfoResponses: result)
+                if !result.isEmpty {
+                    self?.setupCurrencyRows(coinInfoResponses: result)
+                }
             }
         }
     }
@@ -75,32 +76,42 @@ class CoinDetailViewController: UIViewController {
     }
 }
 
-// - MARK: Loading Indicator
-extension CoinDetailViewController {
-    private func showLoadingIndicator() {
-            let indicator = UIActivityIndicatorView(style: .large)
-            indicator.translatesAutoresizingMaskIntoConstraints = false
-            indicator.startAnimating()
+// - MARK: Error Handling and Loading Indicator
 
-            view.addSubview(indicator)
-            NSLayoutConstraint.activate([
-                indicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-                indicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
-            ])
-            activityIndicator = indicator
-        }
+extension CoinDetailViewController: CoinDetailViewDelegate {
+    func showLoading() {
+        let indicator = UIActivityIndicatorView(style: .large)
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        indicator.startAnimating()
 
-        private func hideLoadingIndicator() {
-            activityIndicator?.stopAnimating()
-            activityIndicator?.removeFromSuperview()
-            view.isUserInteractionEnabled = true
-            activityIndicator = nil
-        }
+        view.addSubview(indicator)
+        NSLayoutConstraint.activate([
+            indicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            indicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+        ])
+        activityIndicator = indicator
+    }
+
+    func hideLoading() {
+        activityIndicator?.stopAnimating()
+        activityIndicator?.removeFromSuperview()
+        view.isUserInteractionEnabled = true
+        activityIndicator = nil
+    }
+    func showError(message: String, retryAction: @escaping () -> Void) {
+        createErrorView(message: message, retryAction: retryAction)
+        hideLoading()
+    }
+
+    func hideError() {
+        removeErrorView()
+    }
 }
 
 // - MARK: Constants
 extension CoinDetailViewController {
     struct Constants {
+        static let viewControllerTitle: String = "Coin Detail"
         struct Layout {
             static let padding: CGFloat = 16
             static let verticalSpacing: CGFloat = 24

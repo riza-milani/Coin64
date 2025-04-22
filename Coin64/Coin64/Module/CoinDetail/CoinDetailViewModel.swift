@@ -6,7 +6,15 @@
 //
 import Foundation
 
+protocol CoinDetailViewDelegate {
+    func showError(message: String, retryAction: @escaping () -> Void)
+    func hideError()
+    func showLoading()
+    func hideLoading()
+}
+
 protocol CoinDetailViewModelProtocol {
+    var viewDeleagte: CoinDetailViewDelegate? { get set }
     func getBTCCurrencies(completion: @escaping ([CoinInfoResponse]) -> Void)
     func formattedCurrentDate() -> String
 }
@@ -18,6 +26,7 @@ class CoinDetailViewModel: CoinDetailViewModelProtocol {
     private let currencies: [Currency] = [.eur, .usd, .gbp]
     private var coinInfoResponses: [CoinInfoResponse]
     private var isLoading: Bool = false
+    var viewDeleagte: CoinDetailViewDelegate?
 
 
     init(coinRepository: CoinRepositoryProtocol, dateTimeStamp: String, coinInfoResponses: [CoinInfoResponse] = []) {
@@ -29,6 +38,7 @@ class CoinDetailViewModel: CoinDetailViewModelProtocol {
 
     func getBTCCurrencies(completion: @escaping ([CoinInfoResponse]) -> Void) {
         isLoading = true
+        viewDeleagte?.showLoading()
         currencies.forEach { currency in
             coinRepository.fetchHistory(
                 instrumentType: .btc,
@@ -39,8 +49,13 @@ class CoinDetailViewModel: CoinDetailViewModelProtocol {
                 guard let self else { return }
                 switch result {
                 case .failure(let error):
-                    // This is simlar to CoinListViewController. For the sake of simplicity, I skipped it. (related to CoinListViewModel.swift comment)
-                    print("Error: \(error)")
+                    DispatchQueue.main.async { [weak self] in
+                        self?.viewDeleagte?.showError(message: "Unable to fetch the price.\n\(error.localizedDescription)") {
+                            self?.viewDeleagte?.hideLoading()
+                            self?.viewDeleagte?.hideError()
+                            self?.getBTCCurrencies(completion:completion)
+                        }
+                    }
                     completion([])
                 case .success(let coinDataResponse):
                     if let response = coinDataResponse.coinInfoResponses.first {
@@ -50,6 +65,9 @@ class CoinDetailViewModel: CoinDetailViewModelProtocol {
                         }
                     }
                     if !isLoading {
+                        DispatchQueue.main.async { [weak self] in
+                            self?.viewDeleagte?.hideLoading()
+                        }
                         completion(coinInfoResponses)
                     }
                 }
