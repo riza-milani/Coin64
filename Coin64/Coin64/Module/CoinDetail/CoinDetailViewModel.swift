@@ -3,20 +3,16 @@
 //  Coin64
 //
 //  Created by Reza on 21.04.25.
+//  Updated by Reza on 27.04.25.
 //
 import Foundation
+import Combine
 
-protocol CoinDetailViewDelegate {
-    func showError(message: String, retryAction: @escaping () -> Void)
-    func hideError()
-    func showLoading()
-    func hideLoading()
-}
-
-protocol CoinDetailViewModelProtocol {
-    var viewDeleagte: CoinDetailViewDelegate? { get set }
-    func getBTCCurrencies(completion: @escaping ([CoinInfoResponse]) -> Void)
-    func formattedCurrentDate() -> String
+protocol CoinDetailViewModelProtocol: ObservableObject {
+    var isLoading: Bool { get set }
+    var coinInfoResponses: [CoinInfoResponse] { get set }
+    var errorMessage: String? { get set }
+    func getBTCCurrencies()
 }
 
 class CoinDetailViewModel: CoinDetailViewModelProtocol {
@@ -24,9 +20,11 @@ class CoinDetailViewModel: CoinDetailViewModelProtocol {
     private let dateTimeStamp: String
     private let dayLimit = 1
     private let currencies: [Currency] = [.eur, .usd, .gbp]
-    private var coinInfoResponses: [CoinInfoResponse]
-    private var isLoading: Bool = false
-    var viewDeleagte: CoinDetailViewDelegate?
+    private var cancellables: Set<AnyCancellable> = []
+
+    @Published var coinInfoResponses: [CoinInfoResponse]
+    @Published var isLoading: Bool = false
+    @Published var errorMessage: String? = nil
 
 
     init(coinRepository: CoinRepositoryProtocol, dateTimeStamp: String, coinInfoResponses: [CoinInfoResponse] = []) {
@@ -36,47 +34,38 @@ class CoinDetailViewModel: CoinDetailViewModelProtocol {
     }
 
 
-    func getBTCCurrencies(completion: @escaping ([CoinInfoResponse]) -> Void) {
+    func getBTCCurrencies() {
         isLoading = true
-        viewDeleagte?.showLoading()
-        currencies.forEach { currency in
+        let publishers = currencies.compactMap {
             coinRepository.fetchHistory(
                 instrumentType: .btc,
                 dayLimit: dayLimit,
-                currency: currency,
+                currency: $0,
                 dateTimeStamp: dateTimeStamp
-            ) { [weak self] result in
-                guard let self else { return }
-                switch result {
-                case .failure(let error):
-                    DispatchQueue.main.async { [weak self] in
-                        self?.viewDeleagte?.showError(message: "Unable to fetch the price.\n\(error.localizedDescription)") {
-                            self?.viewDeleagte?.hideLoading()
-                            self?.viewDeleagte?.hideError()
-                            self?.getBTCCurrencies(completion:completion)
-                        }
-                    }
-                    completion([])
-                case .success(let coinDataResponse):
-                    if let response = coinDataResponse.coinInfoResponses.first {
-                        coinInfoResponses.append(response)
-                        if coinInfoResponses.count == currencies.count {
-                            isLoading = false
-                        }
-                    }
-                    if !isLoading {
-                        DispatchQueue.main.async { [weak self] in
-                            self?.viewDeleagte?.hideLoading()
-                        }
-                        completion(coinInfoResponses)
-                    }
-                }
-            }
+            )
         }
-    }
 
-    func formattedCurrentDate() -> String {
-        dateTimeStamp.formattedDate
+        Publishers
+            .MergeMany(publishers)
+            .collect()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] completion in
+                self?.isLoading = false
+
+                if case .failure(let error) = completion {
+                    self?.errorMessage = error.localizedDescription
+                } else {
+                    self?.errorMessage = nil
+                }
+            } receiveValue: { [weak self] result in
+                self?.coinInfoResponses = result
+                    .compactMap { coinDataResponse in
+                        coinDataResponse.coinInfoResponses.first
+                    }
+                    .sorted { $0.instrument < $1.instrument }
+
+            }
+            .store(in: &cancellables)
     }
 }
 

@@ -3,21 +3,23 @@
 //  Coin64
 //
 //  Created by Reza on 21.04.25.
+//  Updated by Reza on 27.04.25.
 //
+
+import Combine
 
 protocol CoinRepositoryProtocol {
     func fetchCurrent(
         instrumentType: InstrumentType,
-        currency: Currency,
-        completeion: @escaping (Result<CoinCurrentResponse,Error>) -> Void
-    )
+        currency: Currency
+    ) -> AnyPublisher<CoinCurrentResponse, Error>
+
     func fetchHistory(
         instrumentType: InstrumentType,
         dayLimit: Int,
         currency: Currency,
-        dateTimeStamp: String?,
-        completeion: @escaping (Result<CoinDataResponse,Error>) -> Void
-    )
+        dateTimeStamp: String?
+    ) -> AnyPublisher<CoinDataResponse, Error>
 }
 
 class CoinRepository: CoinRepositoryProtocol {
@@ -31,24 +33,17 @@ class CoinRepository: CoinRepositoryProtocol {
     /// currency: default value is set to EUR, regarding the task requirements.
     func fetchCurrent(
         instrumentType: InstrumentType,
-        currency: Currency = .eur,
-        completeion: @escaping (Result<CoinCurrentResponse,Error>) -> Void
-    ) {
+        currency: Currency = .eur
+    ) -> AnyPublisher<CoinCurrentResponse, Error> {
         let endpoint: Endpoint = .current(.production, instrumentType, currency)
-
-        serviceProvider.request(endpoint, responseType: CoinCurrentData.self) { result in
-            switch result {
-            case .success(let coinCurrentData):
-                let response = CoinCurrentResponse(
-                    currentValue: coinCurrentData.exchange.currentValue,
-                    lastTimeStamp: coinCurrentData.exchange.lastTimeStamp
+        return serviceProvider.request(endpoint, responseType: CoinCurrentData.self)
+            .map {
+                CoinCurrentResponse(
+                    currentValue: $0.exchange.currentValue,
+                    lastTimeStamp: $0.exchange.lastTimeStamp
                 )
-                completeion(.success(response))
-
-            case .failure(let error):
-                completeion(.failure(error))
             }
-        }
+            .eraseToAnyPublisher()
     }
 
     /// Fetches historical exchange rates of BTC
@@ -58,25 +53,17 @@ class CoinRepository: CoinRepositoryProtocol {
         instrumentType: InstrumentType = .btc,
         dayLimit: Int = 14,
         currency: Currency = .eur,
-        dateTimeStamp: String? = nil,
-        completeion: @escaping (Result<CoinDataResponse,Error>) -> Void) {
-            let endpoint: Endpoint = .historical(
-                .production,
-                instrumentType,
-                currency,
-                daysLimit: dayLimit,
-                dateTimeStamp: dateTimeStamp
-            )
-
-            serviceProvider.request(endpoint, responseType: CoinData.self) { result in
-                switch result {
-                case .success(let coinData):
-                    let response = CoinDataResponse(coinData: coinData)
-                    completeion(.success(response))
-
-                case .failure(let error):
-                    completeion(.failure(error))
-                }
-            }
-        }
+        dateTimeStamp: String? = nil
+    ) -> AnyPublisher<CoinDataResponse, Error> {
+        let endpoint: Endpoint = .historical(
+            .production,
+            instrumentType,
+            currency,
+            daysLimit: dayLimit,
+            dateTimeStamp: dateTimeStamp
+        )
+        return serviceProvider.request(endpoint, responseType: CoinData.self)
+            .map { CoinDataResponse(coinData: $0) }
+            .eraseToAnyPublisher()
+    }
 }

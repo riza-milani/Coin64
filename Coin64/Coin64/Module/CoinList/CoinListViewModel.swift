@@ -6,118 +6,106 @@
 //
 
 import Foundation
+import Combine
 
-protocol CoinListViewDelegate {
-    func showLoading()
-    func hideLoading()
-    func showError(message: String, retryAction: @escaping () -> Void)
-    func hideError()
-}
-
-protocol CoinListViewModelProtocol {
-    var viewDeleagte: CoinListViewDelegate? { get set }
-    var sortedCoinDataResponse: [CoinInfoResponse] { get }
-    func getBTCHistory(completion: @escaping ([CoinInfoResponse]) -> Void)
-    func getLatestBTC(completion: @escaping () -> Void)
-    func setRefreshLastPrice(isEnable: Bool, completion: @escaping () -> Void)
-    func showDetail(index:Int, completion: ((CoinDetailViewModel) -> Void))
+protocol CoinListViewModelProtocol: ObservableObject {
+    var sortedCoinDataResponse: [CoinInfoResponse] { get set }
+    var isLoading: Bool { get set }
+    var isRefreshingEnabled: Bool { get set}
+    var errorMessage: String? { get set }
+    func getBTCHistory()
+    func getLatestBTC()
+    func makeCoinDetailViewModel(dateTimeStamp: Int) -> CoinDetailViewModel
+    func isLatestItem(dateTimeStamp: Int?) -> Bool
 }
 
 class CoinListViewModel: CoinListViewModelProtocol {
-    private let coinRepository: CoinRepositoryProtocol
+
     let refreshRateInSeconds: TimeInterval = 10
+    let dayLimit: Int = 14
+    let defaultCurrency: Currency = .eur
+    let defaultInstrumentType: InstrumentType = .btc
 
-    private var timer: Timer?
-    var viewDeleagte: CoinListViewDelegate?
-    var sortedCoinDataResponse: [CoinInfoResponse] = []
+    @Published var sortedCoinDataResponse: [CoinInfoResponse] = []
+    @Published var isLoading = false
+    @Published var isRefreshingEnabled = true
+    @Published var errorMessage: String? = nil
 
-    init(coinRepository: CoinRepositoryProtocol) {
+    private let coinRepository: CoinRepositoryProtocol
+    private let timerService: TimerServiceProtocol
+
+    private var cancellables: Set<AnyCancellable> = []
+
+    init(coinRepository: CoinRepositoryProtocol, timerService: TimerServiceProtocol = TimerService()) {
         self.coinRepository = coinRepository
+        self.timerService = timerService
     }
 
-    func getBTCHistory(completion: @escaping ([CoinInfoResponse]) -> Void) {
-        viewDeleagte?.showLoading()
+    func getBTCHistory() {
+        isLoading = true
         coinRepository
             .fetchHistory(
-                instrumentType: .btc,
-                dayLimit: 14,
-                currency: .eur,
+                instrumentType: defaultInstrumentType,
+                dayLimit: dayLimit,
+                currency: defaultCurrency,
                 dateTimeStamp: nil
-            ) { [weak self] result in
-                guard let self = self else { return }
-                DispatchQueue.main.async { [weak self] in
-                    self?.viewDeleagte?.hideLoading()
+            )
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] completion in
+                self?.isLoading = false
+                if case .failure(let error) = completion {
+                    self?.errorMessage = error.localizedDescription
+                } else {
+                    self?.errorMessage = nil
                 }
-                switch result {
-                case .failure(let error):
-                    DispatchQueue.main.async { [weak self] in
-                        self?.viewDeleagte?.showError(message: "Unable to fetch the list of prices.\n\(error.localizedDescription)") {
-                            self?.viewDeleagte?.hideError()
-                            self?.getBTCHistory(completion:completion)
-                        }
-                    }
-                    completion([])
-                case .success(let coinDataResponse):
-                    sortedCoinDataResponse = coinDataResponse.coinInfoResponses.sorted { $0.timestamp > $1.timestamp }
-                    completion(sortedCoinDataResponse)
-                }
-
-            }
+            } receiveValue: { [weak self] coinDataResponse in
+                self?.isLoading = false
+                self?.sortedCoinDataResponse = coinDataResponse.coinInfoResponses.sorted { $0.timestamp > $1.timestamp }
+                self?.setupRefreshTimer()
+            }.store(in: &cancellables)
     }
 
-    func getLatestBTC(completion: @escaping () -> Void) {
-        coinRepository.fetchCurrent(instrumentType: .btc, currency: .eur, completeion: { [weak self] result in
-            guard let self = self else { return }
-            // Update with latest price and date
-            switch result {
-            case .failure(let error):
-                DispatchQueue.main.async { [weak self] in
-                    self?.viewDeleagte?.showError(message: "Unable to fetch the latest price.\n\(error.localizedDescription)") {
-                        self?.viewDeleagte?.hideError()
-                        self?.getLatestBTC(completion:completion)
-                    }
+    func getLatestBTC() {
+        coinRepository.fetchCurrent(instrumentType: .btc, currency: .eur)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] completion in
+                self?.isLoading = false
+                if case .failure(let error) = completion {
+                    self?.errorMessage = error.localizedDescription
                 }
-                completion()
-            case .success(let coinDataResponse):
-                if !sortedCoinDataResponse.isEmpty {
-                    sortedCoinDataResponse[0].close = coinDataResponse.currentValue
-                    sortedCoinDataResponse[0].timestamp = coinDataResponse.lastTimeStamp
+            } receiveValue: { [weak self] coinCurrentDataResponse in
+                if var latest = self?.sortedCoinDataResponse.first {
+                    latest.updateBy(
+                        timestamp: coinCurrentDataResponse.lastTimeStamp,
+                        close: coinCurrentDataResponse.currentValue
+                    )
+                    self?.sortedCoinDataResponse[0] = latest
                 }
-                completion()
             }
-
-        })
+            .store(in: &cancellables)
     }
 
-    func showDetail(index: Int, completion: (CoinDetailViewModel) -> Void) {
-        let coinDetailViewModel = CoinDetailViewModel(
-            coinRepository: coinRepository,
-            dateTimeStamp: "\(sortedCoinDataResponse[index].timestamp)"
-        )
-        completion(coinDetailViewModel)
+    private func setupRefreshTimer() {
+        timerService.startTimer(interval: refreshRateInSeconds, repeats: true) { [weak self] in
+            guard let self = self, self.isRefreshingEnabled else { return }
+            self.getLatestBTC()
+        }
+    }
+
+    deinit {
+        timerService.invalidate()
+    }
+
+    func isLatestItem(dateTimeStamp: Int?) -> Bool {
+        sortedCoinDataResponse.first?.timestamp == dateTimeStamp
     }
 }
 
-// - MARK: Refreshing the price
+
+// MARK: - CoinListViewModel Factory
+
 extension CoinListViewModel {
-
-    func setRefreshLastPrice(isEnable: Bool, completion: @escaping () -> Void) {
-        if isEnable {
-            startTimer(completion: completion)
-        } else {
-            stopTimer()
-        }
-    }
-
-    private func startTimer(completion: @escaping () -> Void) {
-        stopTimer()
-        timer = Timer.scheduledTimer(withTimeInterval: refreshRateInSeconds, repeats: true) { [weak self] _ in
-            self?.getLatestBTC(completion: completion)
-        }
-    }
-
-    private func stopTimer() {
-        timer?.invalidate()
-        timer = nil
+    func makeCoinDetailViewModel(dateTimeStamp: Int) -> CoinDetailViewModel {
+        return CoinDetailViewModel(coinRepository: coinRepository, dateTimeStamp: String(dateTimeStamp))
     }
 }

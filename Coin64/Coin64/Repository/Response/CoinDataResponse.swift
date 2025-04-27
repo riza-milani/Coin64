@@ -3,6 +3,7 @@
 //  Coin64
 //
 //  Created by Reza on 21.04.25.
+//  Created by Reza on 27.04.25.
 //
 
 struct CoinInfoResponse: Decodable {
@@ -29,6 +30,23 @@ extension CoinInfoResponse {
             return ""
         }
     }
+
+    var increasingPrice: Bool {
+        close >= `open`
+    }
+
+    var change: Double {
+        abs(close - `open`)
+    }
+
+    var changePercent: Double {
+        (change / `open`) * 100
+    }
+
+    mutating func updateBy(timestamp: Int ,close: Double) {
+        self.close = close
+        self.timestamp = timestamp
+    }
 }
 
 
@@ -50,5 +68,16 @@ struct CoinDataResponse: Decodable {
                                  close: info.close)
             }
         }
+    }
+}
+
+extension CoinInfoResponse: Equatable {
+    static func == (lhs: CoinInfoResponse, rhs: CoinInfoResponse) -> Bool {
+        return lhs.timestamp == rhs.timestamp &&
+               lhs.instrument == rhs.instrument &&
+               lhs.close == rhs.close &&
+               lhs.open == lhs.open &&
+               lhs.high == lhs.high &&
+               lhs.low == lhs.low
     }
 }

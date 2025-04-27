@@ -3,36 +3,47 @@
 //  Coin64
 //
 //  Created by Reza on 22.04.25.
+//  Updated by Reza on 27.04.25.
 //
+
 import XCTest
+import Combine
 @testable import Coin64
+
 
 class MockRepository: CoinRepositoryProtocol {
     var shouldRaiseError: Bool = false
-
-    func fetchCurrent(instrumentType: Coin64.InstrumentType, currency: Coin64.Currency, completeion: @escaping (Result<Coin64.CoinCurrentResponse, any Error>) -> Void) {
-        switch shouldRaiseError {
-        case true:
-            completeion(.failure(NSError(domain: "", code: 0, userInfo: nil)))
-            return
-        default:
-            completeion(.success(Coin64.CoinCurrentResponse(currentValue: 2000, lastTimeStamp: 1744156801)))
+    var mockCoinCurrentResponse: CoinCurrentResponse?
+    var mockCoinDataResponse: CoinDataResponse?
+    
+    func fetchCurrent(instrumentType: InstrumentType, currency: Currency) -> AnyPublisher<CoinCurrentResponse, Error> {
+        if shouldRaiseError {
+            return Fail(error: URLError(.badServerResponse))
+                .eraseToAnyPublisher()
+        } else if let response = mockCoinCurrentResponse {
+            return Just(response)
+                .setFailureType(to: Error.self)
+                .eraseToAnyPublisher()
+        } else {
+            return Empty(completeImmediately: true)
+                .setFailureType(to: Error.self)
+                .eraseToAnyPublisher()
         }
     }
-
-    func fetchHistory(instrumentType: Coin64.InstrumentType, dayLimit: Int, currency: Coin64.Currency, dateTimeStamp: String?, completeion: @escaping (Result<Coin64.CoinDataResponse, any Error>) -> Void) {
-        switch shouldRaiseError {
-        case true:
-            completeion(.failure(NSError(domain: "", code: 0, userInfo: nil)))
-            return
-        default:
-            let coinInfo = CoinInfo(timestamp: 1744156800, type: "986", market: "cadli", instrument: "BTC-EUR", open: 1000.0, high: 1000.0, low: 800.0, close: 1000.0)
-            let coinData = CoinData(data: [coinInfo], error: nil)
-            let response = CoinDataResponse(coinData: coinData)
-            completeion(.success(response))
+    
+    func fetchHistory(instrumentType: InstrumentType, dayLimit: Int, currency: Currency, dateTimeStamp: String?)  -> AnyPublisher<CoinDataResponse, Error> {
+        
+        if shouldRaiseError {
+            return Fail(error: NSError(domain: "fetchHistory", code: 1001, userInfo: nil)).eraseToAnyPublisher()
+                .eraseToAnyPublisher()
+        } else if let response = mockCoinDataResponse {
+            return Just(response)
+                .setFailureType(to: Error.self)
+                .eraseToAnyPublisher()
+        } else {
+            return Empty(completeImmediately: true)
+                .setFailureType(to: Error.self)
+                .eraseToAnyPublisher()
         }
-
     }
-
-
 }

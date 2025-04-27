@@ -21,7 +21,11 @@ struct ExchangeData: Decodable {
         let container = try decoder.container(keyedBy: DynamicKey.self)
 
         guard let firstKey = container.allKeys.first else {
-            throw NSError()
+            let context = DecodingError.Context(
+                codingPath: decoder.codingPath,
+                debugDescription: "Expected at least one key in the container."
+            )
+            throw DecodingError.dataCorrupted(context)
         }
 
         pair = firstKey.stringValue
