@@ -8,12 +8,12 @@
 
 import SwiftUI
 
-
 struct CoinListView<ViewModel>: View where ViewModel: CoinListViewModelProtocol  {
+    
     private let navigationTitle = "Bitcoin Prices"
 
     @ObservedObject var viewModel: ViewModel
-    @State private var isDetailPresented = false
+
     var body: some View {
         NavigationView {
             ZStack {

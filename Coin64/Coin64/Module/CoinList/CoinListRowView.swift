@@ -12,8 +12,6 @@ struct CoinListRowView: View {
     let coinInfoResponse: CoinInfoResponse
     let isLatest: Bool
 
-    private static var formatters: [String: NumberFormatter] = [:]
-
     private var priceFormatter: NumberFormatter {
         PriceFormatter.shared.currencyFormatter(with: coinInfoResponse.currencySymbol)
     }

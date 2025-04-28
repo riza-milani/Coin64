@@ -61,19 +61,20 @@ class CoinServiceProvider: CoinServiceProviderProtocol {
     }
 }
 
+//MARK: - Localized errors
 extension CoinServiceProvider.NetworkError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return NSLocalizedString("The URL provided is invalid.", comment: "")
+            return String(localized: "The URL provided is invalid.", comment: "Invalid URL error")
         case .noInternetConnection:
-            return NSLocalizedString("No internet connection is available.", comment: "")
+            return String(localized: "No internet connection is available.", comment: "No internet connection error")
         case .invalidResponse:
-            return NSLocalizedString("The server response was invalid.", comment: "")
+            return String(localized: "The server response was invalid.", comment: "Invalid server response error")
         case .invalidStatusCode(let code):
-            return String(format: NSLocalizedString("Received HTTP status code %d.", comment: ""), code)
+            return String(localized: "Received HTTP status code \(code).", comment: "Invalid HTTP status code error")
         case .decodingError(let error):
-            return String(format: NSLocalizedString("Failed to decode the response: %@", comment: ""), error.localizedDescription)
+            return String(localized: "Failed to decode the response: \(error.localizedDescription)", comment: "Decoding error")
         }
     }
 }

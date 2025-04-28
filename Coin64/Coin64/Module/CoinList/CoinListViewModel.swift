@@ -41,6 +41,10 @@ class CoinListViewModel: CoinListViewModelProtocol {
         self.timerService = timerService
     }
 
+    deinit {
+        timerService.invalidate()
+    }
+
     func getBTCHistory() {
         isLoading = true
         coinRepository
@@ -85,19 +89,15 @@ class CoinListViewModel: CoinListViewModelProtocol {
             .store(in: &cancellables)
     }
 
+    func isLatestItem(dateTimeStamp: Int?) -> Bool {
+        sortedCoinDataResponse.first?.timestamp == dateTimeStamp
+    }
+
     private func setupRefreshTimer() {
         timerService.startTimer(interval: refreshRateInSeconds, repeats: true) { [weak self] in
             guard let self = self, self.isRefreshingEnabled else { return }
             self.getLatestBTC()
         }
-    }
-
-    deinit {
-        timerService.invalidate()
-    }
-
-    func isLatestItem(dateTimeStamp: Int?) -> Bool {
-        sortedCoinDataResponse.first?.timestamp == dateTimeStamp
     }
 }
 

@@ -10,7 +10,6 @@ import SwiftUI
 struct CoinDetailCardView: View {
     let price: CoinInfoResponse
 
-
     private var priceFormatter: NumberFormatter {
         PriceFormatter.shared.currencyFormatter(with: price.currencySymbol)
     }
@@ -23,10 +22,10 @@ struct CoinDetailCardView: View {
 
             Divider()
 
-            InfoRow(title: "Close", value: price.close)
-            InfoRow(title: "Open", value: price.open)
-            InfoRow(title: "High", value: price.high)
-            InfoRow(title: "Low", value: price.low)
+            InfoRow(title: "Close", value: price.close, currencySymbol: price.currencySymbol)
+            InfoRow(title: "Open", value: price.open, currencySymbol: price.currencySymbol)
+            InfoRow(title: "High", value: price.high, currencySymbol: price.currencySymbol)
+            InfoRow(title: "Low", value: price.low, currencySymbol: price.currencySymbol)
 
             let change = price.close - price.open
             let percentChange = (price.close - price.open) / price.open * 100
@@ -54,13 +53,10 @@ struct CoinDetailCardView: View {
     struct InfoRow: View {
         let title: String
         let value: Double
+        let currencySymbol: String?
 
         private var priceFormatter: NumberFormatter {
-            let formatter = NumberFormatter()
-            formatter.numberStyle = .decimal
-            formatter.minimumFractionDigits = 2
-            formatter.maximumFractionDigits = 2
-            return formatter
+            PriceFormatter.shared.currencyFormatter(with: currencySymbol ?? "")
         }
 
         var body: some View {
