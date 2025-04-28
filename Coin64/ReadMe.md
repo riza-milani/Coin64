@@ -41,13 +41,14 @@ The project follows the **MVVM (Model-View-ViewModel)** pattern and has cleanly 
   - `CoinListViewModel`: fetches historical data and manages auto-refresh
   - `CoinDetailViewModel`: fetches multi-currency data for a selected date
 - **Views / Controllers**:
-  - Simple UIKit-based screens using `UIViewController` and `UITableView`
+  - Simple SwiftUI-based screens using `SwiftUI` and `Combine`
 
 ---
 
 ## Testing
 
 - Includes unit tests for ViewModels and Repository logic
+- Xcode Code coverage report: 100% of logics (pure view componenets are not included)
 - Mock services used to simulate API success and failure scenarios
 
 
